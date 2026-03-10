@@ -24,6 +24,6 @@ public class CheckInventoryWorker {
     }
     LOG.info("Checking inventory for item: {}", job.getKey());
     LOG.info("check-inventory completed ");
-    return Map.of("item", item + " allocated");
+    return Map.of("item-allocation", item + " allocated");
   }
 }
