@@ -178,6 +178,20 @@ Process variables are dynamic data that flow through the BPMN process. They do n
    return Map.of("item-allocation", item + " allocated");
    ```
 
+4. **Access all variables at once** - Use `getVariablesAsMap()` on the `ActivatedJob` object:
+   ```java
+   @JobWorker(type = "ship-items")
+   public void shipItems(final ActivatedJob job) {
+       // Get all process variables as a Map
+       Map<String, Object> allVariables = job.getVariablesAsMap();
+       LOG.info("All process variables: {}", allVariables);
+       
+       // Other options:
+       // String json = job.getVariables();                    // As JSON string
+       // MyClass vars = job.getVariablesAsType(MyClass.class); // As custom object
+   }
+   ```
+
 ### Variable Flow Example
 
 ```

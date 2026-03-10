@@ -14,6 +14,11 @@ public class ShipItemsWorker {
   @JobWorker(type = "ship-items")
   public Map<String, String> shipItems(final ActivatedJob job) {
     LOG.info("Processing ship-items job: {}", job.getKey());
+
+    // Get all process variables
+    Map<String, Object> allVariables = job.getVariablesAsMap();
+    LOG.info("All process variables: {}", allVariables);
+
     LOG.info("ship-items job completed: {}", job.getKey());
     return Map.of();
   }
