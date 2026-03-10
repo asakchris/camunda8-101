@@ -26,6 +26,7 @@ camunda8-101/
 │   ├── main/
 │   │   ├── java/com/camunda/academy/
 │   │   │   ├── ProcessOrderApplication.java   # Spring Boot main class
+│   │   │   ├── ProcessController.java         # REST API controller
 │   │   │   ├── CheckInventoryWorker.java      # Worker for check-inventory task
 │   │   │   ├── ChargePaymentWorker.java       # Worker for charge-payment task
 │   │   │   └── ShipItemsWorker.java           # Worker for ship-items task
@@ -42,6 +43,9 @@ camunda8-101/
 The application is configured to connect to a self-managed Camunda 8 instance. Update `src/main/resources/application.yml` to match your environment:
 
 ```yaml
+server:
+  port: 8090
+
 spring:
   application:
     name: Process Order
@@ -64,6 +68,7 @@ logging:
 
 | Property | Description | Default |
 |----------|-------------|---------|
+| `server.port` | HTTP server port | `8090` |
 | `camunda.client.mode` | Connection mode (`self-managed` or `saas`) | `self-managed` |
 | `camunda.client.grpc-address` | Zeebe gRPC gateway address | `http://127.0.0.1:26500` |
 | `camunda.client.rest-address` | Camunda REST API address | `http://127.0.0.1:8080` |
@@ -95,6 +100,55 @@ mvn clean install
    ```bash
    mvn spring-boot:run
    ```
+
+## Job Workers
+
+## REST API
+
+The application exposes a REST API to interact with the process engine.
+
+### Start a Process Instance
+
+**Endpoint:** `POST http://localhost:8090/api/process/start`
+
+Starts a new instance of the `process1` BPMN process.
+
+#### Request
+
+- **Content-Type**: `application/json`
+- **Body** (optional): JSON object with process variables
+
+#### Example: Start with variables
+
+```bash
+curl -X POST http://localhost:8090/api/process/start \
+  -H "Content-Type: application/json" \
+  -d '{"orderId": "12345", "item": "Widget", "customerName": "John Doe"}'
+```
+
+#### Example: Start without variables
+
+```bash
+curl -X POST http://localhost:8090/api/process/start
+```
+
+#### Response
+
+```json
+{
+  "processInstanceKey": 2251799813685250,
+  "bpmnProcessId": "process1",
+  "version": 1,
+  "processDefinitionKey": 2251799813685249
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `processInstanceKey` | Unique identifier for this process instance |
+| `bpmnProcessId` | The BPMN process ID (`process1`) |
+| `version` | Version of the deployed process definition |
+| `processDefinitionKey` | Unique key for the process definition |
 
 ## Job Workers
 
