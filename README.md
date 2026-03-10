@@ -42,12 +42,22 @@ camunda8-101/
 The application is configured to connect to a self-managed Camunda 8 instance. Update `src/main/resources/application.yml` to match your environment:
 
 ```yaml
-spring.application.name: Process Order
+spring:
+  application:
+    name: Process Order
+
 camunda:
   client:
     mode: self-managed
     grpc-address: http://127.0.0.1:26500
     rest-address: http://127.0.0.1:8080
+    execution-threads: 4
+
+logging:
+  level:
+    io.camunda.client: DEBUG
+    io.camunda.zeebe.spring.client: DEBUG
+    io.camunda.client.impl.CamundaCallCredentials: ERROR
 ```
 
 ### Configuration Options
@@ -57,6 +67,17 @@ camunda:
 | `camunda.client.mode` | Connection mode (`self-managed` or `saas`) | `self-managed` |
 | `camunda.client.grpc-address` | Zeebe gRPC gateway address | `http://127.0.0.1:26500` |
 | `camunda.client.rest-address` | Camunda REST API address | `http://127.0.0.1:8080` |
+| `camunda.client.execution-threads` | Number of threads for job worker execution | `1` |
+
+### Job Worker Thread Pool
+
+All job workers in this application share a single thread pool. By default, the pool size is 1 (single-threaded). You can increase this using the `camunda.client.execution-threads` property for better throughput when:
+
+- Running multiple process instances concurrently
+- Using parallel gateways in BPMN that create concurrent jobs
+- Handling high job throughput with many queued jobs
+
+> **Note**: Jobs from a single sequential process instance will still execute one at a time, even with multiple threads configured. The thread pool helps when there are multiple concurrent jobs available.
 
 ## Building the Application
 
