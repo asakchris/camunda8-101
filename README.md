@@ -150,6 +150,63 @@ curl -X POST http://localhost:8090/api/process/start
 | `version` | Version of the deployed process definition |
 | `processDefinitionKey` | Unique key for the process definition |
 
+## Process Variables
+
+Process variables are dynamic data that flow through the BPMN process. They do not need to be pre-defined in the BPMN model.
+
+### How Variables Work
+
+1. **Pass variables when starting a process** - Include them in the JSON body of the REST API request:
+   ```bash
+   curl -X POST http://localhost:8090/api/process/start \
+     -H "Content-Type: application/json" \
+     -d '{"item": "Laptop", "orderId": "ORD-123", "quantity": 5}'
+   ```
+
+2. **Access variables in job workers** - Use the `@Variable` annotation to inject variables:
+   ```java
+   @JobWorker(type = "check-inventory")
+   public Map<String, String> checkInventory(
+       final ActivatedJob job, 
+       @Variable(name = "item") @Nullable String itemOrdered) {
+       // itemOrdered will contain "Laptop" from the process start
+   }
+   ```
+
+3. **Add or update variables** - Workers can return a `Map` to add/update variables for downstream tasks:
+   ```java
+   return Map.of("item-allocation", item + " allocated");
+   ```
+
+### Variable Flow Example
+
+```
+Start Process                    CheckInventoryWorker              ChargePaymentWorker
+     │                                  │                                 │
+     │  {"item": "Laptop",              │                                 │
+     │   "orderId": "ORD-123"}          │                                 │
+     │ ─────────────────────────────────>                                 │
+     │                                  │                                 │
+     │                      Receives: item = "Laptop"                     │
+     │                      Returns: item-allocation = "Laptop allocated" │
+     │                                  │                                 │
+     │                                  │ ───────────────────────────────>│
+     │                                  │                                 │
+     │                                  │     Receives: item = "Laptop"   │
+     │                                  │     item-allocation = "..."     │
+     │                                  │     orderId = "ORD-123"         │
+```
+
+### Available Variables for This Process
+
+| Variable | Type | Description | Set By |
+|----------|------|-------------|--------|
+| `item` | String | The item being ordered (optional, defaults to "default-item") | Process start |
+| `orderId` | String | Order identifier | Process start |
+| `item-allocation` | String | Allocation status of the item | CheckInventoryWorker |
+
+> **Note**: Variables are scoped to the process instance and persist throughout its lifecycle. Any task can read variables set by previous tasks or at process start.
+
 ## Job Workers
 
 The application includes three job workers that handle service tasks in the BPMN process:
