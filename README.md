@@ -1,47 +1,69 @@
 # Camunda 8 - Getting Started Example
 
-This project is a Spring Boot application that demonstrates how to build and deploy a process application using **Camunda 8**. It was created by following the [Camunda Getting Started Guide](https://docs.camunda.io/docs/next/guides/getting-started-example).
+This project is a multi-module Spring Boot application that demonstrates how to build and deploy a process application using **Camunda 8**. It was created by following the [Camunda Getting Started Guide](https://docs.camunda.io/docs/next/guides/getting-started-example).
 
 ## Overview
 
-The application implements a simple **Process Order** workflow with the following service tasks:
+This is a multi-module Maven project with the following modules:
+
+### Order Module
+The main application module implementing a simple **Process Order** workflow with the following service tasks:
 
 - **Check Inventory** - Verifies item availability
 - **Charge Payment** - Processes payment for the order
 - **Ship Items** - Handles shipping of ordered items
+- **Send Email** - Sends email notification to users (handled by Util module)
+
+### Util Module
+A utility module containing additional job workers:
+
+- **Send Email** - Sends email notifications to users
 
 ## Prerequisites
 
 - **Java 21** or higher
-- **Maven 3.6+**
-- **Camunda 8** (Self-Managed or SaaS)
-  - For local development, you can use [Camunda Desktop Modeler](https://camunda.com/download/modeler/) and a local Camunda 8 instance
+- **Maven 3.9+**
+- **Camunda 8 Run** (for local development)
+  - Download from [Camunda 8 Run](https://github.com/camunda/camunda/releases) or install via [Camunda Desktop Modeler](https://camunda.com/download/modeler/) starter package
 
 ## Project Structure
 
 ```
 camunda8-101/
-├── pom.xml                                    # Maven configuration
-├── src/
-│   ├── main/
-│   │   ├── java/com/camunda/academy/
-│   │   │   ├── ProcessOrderApplication.java   # Spring Boot main class
-│   │   │   ├── ProcessController.java         # REST API controller
-│   │   │   ├── CheckInventoryWorker.java      # Worker for check-inventory task
-│   │   │   ├── ChargePaymentWorker.java       # Worker for charge-payment task
-│   │   │   └── ShipItemsWorker.java           # Worker for ship-items task
-│   │   └── resources/
-│   │       ├── application.yml                # Application configuration
-│   │       └── diagram_1.bpmn                 # BPMN process definition
-│   └── test/
-│       └── java/                              # Test classes
-└── target/                                    # Build output
+├── pom.xml                                    # Parent Maven configuration
+├── order/                                     # Order module
+│   ├── pom.xml                               # Order module Maven configuration
+│   └── src/
+│       ├── main/
+│       │   ├── java/com/camunda/academy/
+│       │   │   ├── ProcessOrderApplication.java   # Spring Boot main class with @Deployment
+│       │   │   ├── ProcessController.java         # REST API controller
+│       │   │   ├── CheckInventoryWorker.java      # Worker for check-inventory task
+│       │   │   ├── ChargePaymentWorker.java       # Worker for charge-payment task
+│       │   │   └── ShipItemsWorker.java           # Worker for ship-items task
+│       │   └── resources/
+│       │       ├── application.yml                # Application configuration
+│       │       └── diagram_1.bpmn                 # BPMN process definition
+│       └── test/
+│           └── java/                              # Test classes
+└── util/                                      # Util module
+    ├── pom.xml                               # Util module Maven configuration
+    └── src/
+        ├── main/
+        │   ├── java/com/camunda/academy/
+        │   │   ├── UtilApplication.java           # Spring Boot main class
+        │   │   └── SendEmailWorker.java           # Worker for send-email task
+        │   └── resources/
+        │       └── application.yml                # Application configuration
+        └── test/
+            └── resources/                         # Test resources
 ```
 
 ## Configuration
 
-The application is configured to connect to a self-managed Camunda 8 instance. Update `src/main/resources/application.yml` to match your environment:
+The applications are configured to connect to a local Camunda 8 Run instance. Update the respective `application.yml` files to match your environment:
 
+### Order Module (`order/src/main/resources/application.yml`)
 ```yaml
 server:
   port: 8090
@@ -64,19 +86,35 @@ logging:
     io.camunda.client.impl.CamundaCallCredentials: ERROR
 ```
 
+### Util Module (`util/src/main/resources/application.yml`)
+```yaml
+spring:
+  application:
+    name: Util Service
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: http://127.0.0.1:26500
+    rest-address: http://127.0.0.1:8080
+    execution-threads: 4
+```
+
+> **Note**: The Util module doesn't expose any REST endpoints, so no `server.port` is configured.
+
 ### Configuration Options
 
 | Property | Description | Default |
 |----------|-------------|---------|
-| `server.port` | HTTP server port | `8090` |
+| `server.port` | HTTP server port (Order module only) | `8090` |
 | `camunda.client.mode` | Connection mode (`self-managed` or `saas`) | `self-managed` |
 | `camunda.client.grpc-address` | Zeebe gRPC gateway address | `http://127.0.0.1:26500` |
 | `camunda.client.rest-address` | Camunda REST API address | `http://127.0.0.1:8080` |
-| `camunda.client.execution-threads` | Number of threads for job worker execution | `1` |
+| `camunda.client.execution-threads` | Number of threads for job worker execution | `4` |
 
 ### Job Worker Thread Pool
 
-All job workers in this application share a single thread pool. By default, the pool size is 1 (single-threaded). You can increase this using the `camunda.client.execution-threads` property for better throughput when:
+All job workers in each module share a single thread pool. By default, the pool size is 4. You can adjust this using the `camunda.client.execution-threads` property for better throughput when:
 
 - Running multiple process instances concurrently
 - Using parallel gateways in BPMN that create concurrent jobs
@@ -86,26 +124,102 @@ All job workers in this application share a single thread pool. By default, the 
 
 ## Building the Application
 
+Build all modules:
 ```bash
 mvn clean install
 ```
 
+Build a specific module:
+```bash
+mvn clean install -pl order
+mvn clean install -pl util
+```
+
 ## Running the Application
 
-1. **Start Camunda 8** - Ensure your Camunda 8 instance is running (either locally or in the cloud)
+### Step 1: Start Camunda 8 Run
 
-2. **Deploy the BPMN process** - The process definition (`diagram_1.bpmn`) will be automatically deployed when the application starts
+Before running the application, you need to start Camunda 8 Run:
 
-3. **Run the Spring Boot application**:
-   ```bash
-   mvn spring-boot:run
-   ```
+1. **Download and Install**: If you haven't already, download [Camunda 8 Run](https://github.com/camunda/camunda/releases) or install via the Camunda Desktop Modeler starter package for Windows.
+
+2. **Start Camunda 8 Run**:
+   - **Windows**: Navigate to the Camunda 8 Run installation directory and run:
+     ```cmd
+     c8run.exe start
+     ```
+   - Or double-click `c8run.exe` and select "Start"
+
+3. **Wait for initialization**: Camunda 8 Run may take 30-60 seconds to fully initialize all components.
+
+4. **Verify it's running**: Open [http://localhost:8080](http://localhost:8080) in your browser. You should see the Camunda dashboard.
+
+> **Important**: Ensure Camunda 8 Run is fully initialized before starting your Spring Boot application. If you see connection errors, restart Camunda 8 Run and wait for it to be ready.
+
+### Step 2: Run the Order Module
+
+The Order module will automatically deploy the BPMN process (`diagram_1.bpmn`) on startup:
+
+```bash
+mvn spring-boot:run -pl order
+```
+
+You should see logs indicating:
+- The BPMN deployment: `Configuring deployments: [DeploymentValue{resources=[classpath:diagram_1.bpmn], tenantId='null'}]`
+- Job workers registered for `check-inventory`, `charge-payment`, and `ship-items`
+
+### Step 3: Run the Util Module (Optional)
+
+If your BPMN process includes the `send-email` service task, run the Util module:
+
+```bash
+mvn spring-boot:run -pl util
+```
+
+This registers the `SendEmailWorker` to handle `send-email` tasks.
+
+### Step 4: Start a Process Instance
+
+Use the REST API to start a process instance:
+
+```bash
+curl -X POST http://localhost:8090/api/process/start \
+  -H "Content-Type: application/json" \
+  -d '{"orderId": "12345", "item": "Widget", "customerName": "John Doe"}'
+```
 
 ## Job Workers
 
+The application includes job workers that handle service tasks in BPMN processes:
+
+### Order Module Workers
+
+#### CheckInventoryWorker
+- **Task Type**: `check-inventory`
+- **Description**: Checks inventory for the ordered item and allocates it
+- **Input Variables**: `item` (optional)
+- **Output Variables**: `item` (with " allocated" suffix)
+
+#### ChargePaymentWorker
+- **Task Type**: `charge-payment`
+- **Description**: Processes payment for the order
+
+#### ShipItemsWorker
+- **Task Type**: `ship-items`
+- **Description**: Ships the ordered items
+
+### Util Module Workers
+
+#### SendEmailWorker
+- **Task Type**: `send-email`
+- **Description**: Sends email notification to users
+- **Input Variables**: `name` (optional, defaults to "User")
+- **Output**: Logs a message indicating email was sent to the user
+
 ## REST API
 
-The application exposes a REST API to interact with the process engine.
+The order module exposes a REST API to interact with the process engine.
+
 
 ### Start a Process Instance
 
@@ -217,34 +331,25 @@ Start Process                    CheckInventoryWorker              ChargePayment
 |----------|------|-------------|--------|
 | `item` | String | The item being ordered (optional, defaults to "default-item") | Process start |
 | `orderId` | String | Order identifier | Process start |
+| `customerName` | String | Customer name for notifications | Process start |
+| `name` | String | User name for email notifications (optional, defaults to "User") | Process start |
 | `item-allocation` | String | Allocation status of the item | CheckInventoryWorker |
 
 > **Note**: Variables are scoped to the process instance and persist throughout its lifecycle. Any task can read variables set by previous tasks or at process start.
 
-## Job Workers
-
-The application includes three job workers that handle service tasks in the BPMN process:
-
-### CheckInventoryWorker
-- **Task Type**: `check-inventory`
-- **Description**: Checks inventory for the ordered item and allocates it
-- **Input Variables**: `item` (optional)
-- **Output Variables**: `item` (with " allocated" suffix)
-
-### ChargePaymentWorker
-- **Task Type**: `charge-payment`
-- **Description**: Processes payment for the order
-
-### ShipItemsWorker
-- **Task Type**: `ship-items`
-- **Description**: Ships the ordered items
-
 ## Testing
 
-Run the tests with:
+Run all tests:
 
 ```bash
 mvn test
+```
+
+Run tests for a specific module:
+
+```bash
+mvn test -pl order
+mvn test -pl util
 ```
 
 The project includes `camunda-process-test-spring` for process testing with JUnit 5.

@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: Util Service
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: http://127.0.0.1:26500
+    rest-address: http://127.0.0.1:8080
+    execution-threads: 4
+
+logging:
+  level:
+    io.camunda.client: DEBUG
+    io.camunda.zeebe.spring.client: DEBUG
+    io.camunda.client.impl.CamundaCallCredentials: ERROR
+
